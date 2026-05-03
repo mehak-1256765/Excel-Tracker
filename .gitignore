@@ -1,0 +1,54 @@
+# ── Dependencies ─────────────────────────────────────────────
+
+# Ignore node_modules inside frontend
+frontend/node_modules/
+
+# (Optional: if backend ever uses Node later)
+backend/node_modules/
+
+
+# ── Build output ─────────────────────────────────────────────
+
+frontend/dist/
+frontend/build/
+frontend/out/
+
+backend/dist/
+backend/build/
+
+
+# ── Environment variables (VERY IMPORTANT) ───────────────────
+
+.env
+.env.*
+frontend/.env
+backend/.env
+
+
+# ── Logs ────────────────────────────────────────────────────
+
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+
+# ── Editor / OS ─────────────────────────────────────────────
+
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+
+# ── Testing ─────────────────────────────────────────────────
+
+coverage/
+
+
+# ── Misc ────────────────────────────────────────────────────
+
+.cache/
+*.zip
+*.tar.gz
