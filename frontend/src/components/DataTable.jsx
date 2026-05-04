@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Columns, CheckSquare, Plus, Trash2, Check, Palette, Save, AlertTriangle } from 'lucide-react'
+import { Search, ChevronUp, ChevronDown, ChevronsUpDown, X, Columns, CheckSquare, Plus, Trash2, Check, Palette, Save, AlertTriangle, AlignJustify } from 'lucide-react'
 import StatusBadge, { STATUS_OPTIONS, STATUS_CONFIG } from './StatusBadge'
 
 // ── Status → row visual style ─────────────────────────────────────────────
@@ -52,6 +52,72 @@ function applyFontToggle(current, toggle) {
   if (newBold) return 'bold'
   if (newItalic) return 'italic'
   return 'normal'
+}
+
+// ── Due date detection ────────────────────────────────────────────────────
+const DATE_COL_RE = /date|due|deadline|by|end|finish/i
+
+function parseDateVal(val) {
+  if (!val) return null
+  const d = new Date(val)
+  return isNaN(d.getTime()) ? null : d
+}
+
+function dueBadge(val) {
+  const d = parseDateVal(val)
+  if (!d) return null
+  const diffDays = Math.ceil((d - new Date()) / 86400000)
+  if (diffDays < 0)  return { text: `${Math.abs(diffDays)}d overdue`, cls: 'bg-red-100 text-red-700 border-red-200' }
+  if (diffDays === 0) return { text: 'Due today',              cls: 'bg-orange-100 text-orange-700 border-orange-200' }
+  if (diffDays <= 2)  return { text: `${diffDays}d left`,      cls: 'bg-amber-100 text-amber-700 border-amber-200' }
+  if (diffDays <= 7)  return { text: `${diffDays}d left`,      cls: 'bg-yellow-50 text-yellow-700 border-yellow-200' }
+  return null
+}
+
+// ── Inline editable cell ──────────────────────────────────────────────────
+function EditableCell({ value, col, isDateCol, onSave, cancelled, fontCls, textCls }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal]         = useState(value || '')
+  const inputRef              = useRef()
+
+  useEffect(() => { setVal(value || '') }, [value])
+
+  const commit = () => {
+    setEditing(false)
+    const trimmed = val.trim()
+    if (trimmed !== (value || '').trim()) onSave(trimmed)
+  }
+
+  const badge = isDateCol ? dueBadge(value) : null
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        autoFocus
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setVal(value || ''); setEditing(false) } }}
+        className="w-full min-w-[120px] text-sm border border-indigo-400 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white shadow-sm"
+      />
+    )
+  }
+
+  return (
+    <div
+      onClick={() => setEditing(true)}
+      className={`min-w-[120px] cursor-text rounded px-1 py-0.5 hover:bg-black/5 transition group/cell ${fontCls} ${textCls} ${cancelled ? 'line-through decoration-gray-300' : ''}`}
+      title="Click to edit"
+    >
+      <span>{value || <span className="text-gray-300 not-italic no-underline font-normal">—</span>}</span>
+      {badge && (
+        <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded border font-medium not-italic no-underline ${badge.cls}`}>
+          {badge.text}
+        </span>
+      )}
+    </div>
+  )
 }
 
 function EditableNotes({ value, onSave }) {
@@ -242,6 +308,15 @@ export default function DataTable({ columns, rows, onRowUpdate, onBulkUpdate, on
   // Per-row color picker state
   const [colorPickerRowId, setColorPickerRowId] = useState(null)
 
+  // Row density: compact | normal | spacious
+  const [density, setDensity] = useState('normal')
+  const DENSITY = { compact: 'py-1.5', normal: 'py-3', spacious: 'py-5' }
+  const cycleDensity = () => setDensity(d => d === 'compact' ? 'normal' : d === 'normal' ? 'spacious' : 'compact')
+  const DENSITY_LABEL = { compact: 'Compact', normal: 'Normal', spacious: 'Spacious' }
+
+  // Detect date columns
+  const dateColumns = useMemo(() => columns.filter(c => DATE_COL_RE.test(c)), [columns])
+
   // Close color picker on outside click
   useEffect(() => {
     const handler = (e) => {
@@ -311,6 +386,11 @@ export default function DataTable({ columns, rows, onRowUpdate, onBulkUpdate, on
 
   const handleRowFont = (rowId, currentStyle, toggle) => {
     onRowUpdate(rowId, { font_style: applyFontToggle(currentStyle || 'normal', toggle) })
+  }
+
+  // ── Cell edit ──────────────────────────────────────────────────────────
+  const handleCellEdit = (rowId, col, newValue) => {
+    onRowUpdate(rowId, { data: { [col]: newValue } })
   }
 
   // ── Filtered / sorted rows ──────────────────────────────────────────────
@@ -414,6 +494,14 @@ export default function DataTable({ columns, rows, onRowUpdate, onBulkUpdate, on
         </div>
         <span className="text-sm text-gray-400 whitespace-nowrap">{filtered.length} of {rows.length}</span>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={cycleDensity}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition"
+            title="Toggle row density"
+          >
+            <AlignJustify className="w-4 h-4" />
+            <span className="hidden sm:inline">{DENSITY_LABEL[density]}</span>
+          </button>
           <ColumnToggle columns={workingCols} hidden={hiddenCols} onToggle={toggleCol} />
           <span className="text-gray-300 hidden sm:block">|</span>
           {addingCol ? (
@@ -639,7 +727,7 @@ export default function DataTable({ columns, rows, onRowUpdate, onBulkUpdate, on
                       style={row.color ? { backgroundColor: row.color } : undefined}
                     >
                       {/* Checkbox cell — holds the left accent bar */}
-                      <td className="px-3 py-3 align-top relative">
+                      <td className={`px-3 ${DENSITY[density]} align-top relative`}>
                         <div
                           className={`absolute left-0 top-0 bottom-0 w-1 transition-colors duration-300 ${
                             isSelected ? 'bg-indigo-500' : st.accent
@@ -654,26 +742,29 @@ export default function DataTable({ columns, rows, onRowUpdate, onBulkUpdate, on
                       </td>
 
                       {/* Row number */}
-                      <td className={`px-3 py-3 text-xs font-mono align-top pt-3.5 ${
+                      <td className={`px-3 ${DENSITY[density]} text-xs font-mono align-top ${
                         row.status === 'cancelled' ? 'text-gray-300' : 'text-gray-400'
                       }`}>
                         {(row.row_index ?? 0) + 1}
                       </td>
 
-                      {/* Data cells */}
+                      {/* Data cells — inline editable */}
                       {visibleCols.map((col) => (
-                        <td
-                          key={col}
-                          className={`px-4 py-3 align-top break-words min-w-[120px] max-w-[320px] ${st.text} ${
-                            row.status === 'cancelled' ? 'line-through decoration-gray-300' : ''
-                          } ${fontClasses(row.font_style)}`}
-                        >
-                          {row.data[col] || <span className="text-gray-300 no-underline">—</span>}
+                        <td key={col} className={`px-4 ${DENSITY[density]} align-top min-w-[120px] max-w-[320px]`}>
+                          <EditableCell
+                            value={row.data[col]}
+                            col={col}
+                            isDateCol={dateColumns.includes(col)}
+                            onSave={(v) => handleCellEdit(row.id, col, v)}
+                            cancelled={row.status === 'cancelled'}
+                            fontCls={fontClasses(row.font_style)}
+                            textCls={st.text}
+                          />
                         </td>
                       ))}
 
                       {/* Status badge */}
-                      <td className="px-4 py-3 align-top">
+                      <td className={`px-4 ${DENSITY[density]} align-top`}>
                         <StatusBadge
                           value={row.status || 'pending'}
                           onChange={(status) => onRowUpdate(row.id, { status })}
@@ -681,7 +772,7 @@ export default function DataTable({ columns, rows, onRowUpdate, onBulkUpdate, on
                       </td>
 
                       {/* Notes */}
-                      <td className="px-4 py-3 align-top">
+                      <td className={`px-4 ${DENSITY[density]} align-top`}>
                         <EditableNotes
                           value={row.notes}
                           onSave={(notes) => onRowUpdate(row.id, { notes })}
@@ -689,7 +780,7 @@ export default function DataTable({ columns, rows, onRowUpdate, onBulkUpdate, on
                       </td>
 
                       {/* Per-row actions: color picker, bold, italic, delete */}
-                      <td className="px-2 py-3 align-top relative">
+                      <td className={`px-2 ${DENSITY[density]} align-top relative`}>
                         <div className="opacity-0 group-hover/row:opacity-100 transition flex items-center gap-1">
                           {/* Color picker toggle button */}
                           <button
