@@ -21,7 +21,7 @@ export default function Navbar({ trackerName }) {
             </div>
             <div className="hidden sm:block">
               <p className="text-[15px] font-bold text-gray-900 leading-tight group-hover:text-indigo-700 transition-colors">
-                Excel Tracker
+                Trackify
               </p>
               <p className="text-[10px] text-indigo-400 leading-none tracking-widest uppercase font-semibold">
                 Progress Monitor
