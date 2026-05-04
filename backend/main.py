@@ -210,6 +210,7 @@ class RowUpdate(BaseModel):
     notes: Optional[str] = None
     color: Optional[str] = None
     font_style: Optional[str] = None
+    data: Optional[dict] = None
 
 
 @app.patch("/api/row/{row_id}")
@@ -224,9 +225,13 @@ def update_row(row_id: str, update: RowUpdate):
     new_color = update.color if update.color is not None else (row["color"] if "color" in row.keys() else "")
     new_font_style = update.font_style if update.font_style is not None else (row["font_style"] if "font_style" in row.keys() else "normal")
 
+    existing_data = json.loads(row["data"])
+    if update.data is not None:
+        existing_data.update({k: str(v) if v is not None else "" for k, v in update.data.items()})
+
     conn.execute(
-        "UPDATE rows SET status=?, notes=?, color=?, font_style=? WHERE id=?",
-        (new_status, new_notes, new_color, new_font_style, row_id),
+        "UPDATE rows SET status=?, notes=?, color=?, font_style=?, data=? WHERE id=?",
+        (new_status, new_notes, new_color, new_font_style, json.dumps(existing_data), row_id),
     )
     conn.execute(
         "UPDATE trackers SET updated_at = ? WHERE id = ?",

@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext'
 import { relativeTime } from '../utils/time'
 import StatsCards from '../components/StatsCards'
 import DataTable from '../components/DataTable'
+import FocusTimer from '../components/FocusTimer'
 
 
 function InlineRename({ name, trackerId, onRenamed }) {
@@ -108,16 +109,27 @@ export default function TrackerDetail() {
     }
   }
 
-  const handleBulkUpdate = async (rowIds, status) => {
+  const handleBulkUpdate = async (rowIds, updates) => {
     try {
-      await axios.post('/api/bulk-update', { row_ids: rowIds, status })
+      await axios.post('/api/bulk-update', { row_ids: rowIds, ...updates })
       setTracker((prev) => ({
         ...prev,
-        rows: prev.rows.map((r) => (rowIds.includes(r.id) ? { ...r, status } : r)),
+        rows: prev.rows.map((r) => rowIds.includes(r.id) ? { ...r, ...updates } : r),
       }))
-      toast(`${rowIds.length} rows → ${status}`)
+      const label = updates.status ? `${rowIds.length} rows → ${updates.status}` : `${rowIds.length} rows updated`
+      toast(label)
     } catch {
       toast('Bulk update failed', 'error')
+    }
+  }
+
+  const handleColumnsUpdate = async (newCols) => {
+    try {
+      await axios.patch(`/api/tracker/${id}/columns`, { columns: newCols })
+      setTracker(prev => ({ ...prev, columns: newCols }))
+      toast('Columns saved')
+    } catch {
+      toast('Failed to save columns', 'error')
     }
   }
 
@@ -214,12 +226,13 @@ export default function TrackerDetail() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <FocusTimer />
             <button
               onClick={exportCSV}
               className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:bg-gray-50 transition font-medium"
             >
               <Download className="w-4 h-4" />
-              Export CSV
+              <span className="hidden sm:inline">Export CSV</span>
             </button>
             <button
               onClick={fetchTracker}
@@ -246,6 +259,7 @@ export default function TrackerDetail() {
             onBulkUpdate={handleBulkUpdate}
             onRowAdd={handleRowAdd}
             onRowDelete={handleRowDelete}
+            onColumnsUpdate={handleColumnsUpdate}
           />
         </div>
       </div>
