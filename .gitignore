@@ -19,8 +19,6 @@ backend/build/
 
 # ── Environment variables (VERY IMPORTANT) ───────────────────
 
-.env
-.env.*
 frontend/.env
 backend/.env
 
@@ -38,7 +36,6 @@ pnpm-debug.log*
 
 .DS_Store
 Thumbs.db
-.vscode/
 .idea/
 
 
@@ -52,3 +49,5 @@ coverage/
 .cache/
 *.zip
 *.tar.gz
+config.bat
+node_modules
